@@ -1,0 +1,80 @@
+version: "3.9"
+services:
+
+  product:
+    build:
+      args:
+        user: deployer
+        uid: 1000
+      context: ./services/product
+      dockerfile: Dockerfile
+    image: product-service
+    container_name: product-service
+    restart: unless-stopped
+    working_dir: /var/www/product
+    volumes:
+      - ./services/product:/var/www/product
+    networks:
+      - microservices
+
+  gateway:
+    build:
+      args:
+        user: deployer
+        uid: 1000
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    image: gateway-service
+    container_name: gateway-service
+    restart: unless-stopped
+    working_dir: /var/www/gateway
+    volumes:
+      - ./services/gateway:/var/www/gateway
+    networks:
+      - microservices
+
+  mysql:
+    image: mysql:latest
+    container_name: mysql-service
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: gateway
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_PASSWORD: password
+      MYSQL_USER: mysql_user
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - ./services/mysql/init_db:/docker-entrypoint-initdb.d
+      - ./services/mysql/data:/var/lib/mysql
+    networks:
+      - microservices
+
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    ports:
+     - 8090:80
+    environment:
+     - PMA_HOST=mysql
+    networks:
+      - microservices
+
+  nginx:
+    image: nginx:1.21.6-alpine
+    container_name: nginx-service
+    restart: unless-stopped
+    ports:
+      - 8091:80
+      - 8092:8080
+    volumes:
+      - ./services/product:/var/www/product
+      - ./services/gateway:/var/www/gateway
+      - ./services/nginx:/etc/nginx/conf.d
+    networks:
+      - microservices
+
+
+networks:
+  microservices:
+    driver: bridge
