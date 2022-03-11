@@ -15,7 +15,7 @@ services:
     volumes:
       - ./services/product:/var/www/product
     networks:
-      - microservices
+      - intranet
 
   gateway:
     build:
@@ -31,7 +31,7 @@ services:
     volumes:
       - ./services/gateway:/var/www/gateway
     networks:
-      - microservices
+      - intranet
 
   mysql:
     image: mysql:latest
@@ -48,33 +48,47 @@ services:
       - ./services/mysql/init_db:/docker-entrypoint-initdb.d
       - ./services/mysql/data:/var/lib/mysql
     networks:
-      - microservices
+      - intranet
 
   phpmyadmin:
     image: phpmyadmin
     restart: always
-    ports:
-     - 8090:80
     environment:
      - PMA_HOST=mysql
     networks:
-      - microservices
+      - intranet
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.docker-microservices`)"
+      - "traefik.http.routers.phpmyadmin.entrypoints=intranet"
+      - "traefik.docker.network=intranet"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
 
   nginx:
     image: nginx:1.21.6-alpine
     container_name: nginx-service
     restart: unless-stopped
-    ports:
-      - 8091:80
-      - 8092:8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=intranet"
+      # Define a router to direct HTTP traffic for 'gateway.docker-microservices' to the port 80 of this service
+      - "traefik.http.routers.gateway.service=gateway" 
+      - "traefik.http.routers.gateway.rule=Host(`gateway.docker-microservices`)"
+      - "traefik.http.routers.gateway.entrypoints=intranet"
+      - "traefik.http.services.gateway.loadbalancer.server.port=80"
+      # Define a router to direct HTTP traffic for 'product.docker-microservices' to the port 8080 of this service 
+      - "traefik.http.routers.product.service=product"
+      - "traefik.http.routers.product.rule=Host(`product.docker-microservices`)"
+      - "traefik.http.routers.product.entrypoints=intranet"
+      - "traefik.http.services.product.loadbalancer.server.port=8080"
     volumes:
       - ./services/product:/var/www/product
       - ./services/gateway:/var/www/gateway
       - ./services/nginx:/etc/nginx/conf.d
     networks:
-      - microservices
+      - intranet
 
 
 networks:
-  microservices:
-    driver: bridge
+  intranet:
+    external: true
